@@ -90,28 +90,37 @@ async function runEquityEval(promptA, promptB, rubric, domain, signalType, conte
   });
 }
 
-async function callClaude(messages) {
+// The model call needs the Anthropic key and API version headers. Without them
+// every request is rejected, so a failure is raised rather than scored.
+async function anthropic(body) {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) throw new Error('ANTHROPIC_API_KEY is not set');
   const res = await fetch(ANTHROPIC_API_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: MODEL, max_tokens: 1000, messages })
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify(body)
   });
   const data = await res.json();
+  if (!res.ok) throw new Error(`Anthropic API ${res.status}: ${data.error?.message || 'request failed'}`);
+  return data;
+}
+
+async function callClaude(messages) {
+  const data = await anthropic({ model: MODEL, max_tokens: 1000, messages });
   return data.content?.find(b => b.type === 'text')?.text || 'No response.';
 }
 
 async function callClaudeJudge(userContent) {
-  const res = await fetch(ANTHROPIC_API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 500,
-      system: JUDGE_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userContent }]
-    })
+  const data = await anthropic({
+    model: MODEL,
+    max_tokens: 500,
+    system: JUDGE_SYSTEM_PROMPT,
+    messages: [{ role: 'user', content: userContent }]
   });
-  const data = await res.json();
   const text = data.content?.find(b => b.type === 'text')?.text || '{}';
   try {
     return JSON.parse(text.replace(/```json|```/g, '').trim());
@@ -455,7 +464,8 @@ app.post('/evaluate/plaid', authenticate, async (req, res) => {
 // ── Start Server ─────────────────────────────────────────────────────────────
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
+// Listen only when run directly, so tests can require the app without a port.
+if (require.main === module) app.listen(PORT, () => {
   console.log(`Equity Lens API running on port ${PORT}`);
   console.log(`Health: http://localhost:${PORT}/health`);
   console.log(`Domains: http://localhost:${PORT}/domains`);
