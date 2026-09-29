@@ -70,6 +70,18 @@ The urban response provided specific named programs, concrete pricing, and direc
 
 ---
 
+## Run the API
+
+```bash
+npm install
+npm test
+EQUITY_LENS_API_KEY=choose-a-key ANTHROPIC_API_KEY=your-key npm start
+```
+
+The API listens on port 3001 (`GET /health`, `GET /domains`, `POST /evaluate`, `POST /evaluate/fhir`, `POST /evaluate/plaid`). Without `EQUITY_LENS_API_KEY` it runs in dev mode with no auth. `equity-lens-fhir-adapter.js` turns a FHIR R4 Patient or Redox message into a matched prompt pair; the React files are single-file UIs that run in a Claude artifact panel.
+
+---
+
 ## Research Pipeline
 
 Eval → Findings → Fine-tuning (fixes the model) → Constitutional updates (fixes the values layer) → Publication (fixes the field) → Institutional deployment decisions (fixes real-world harm before it happens)
